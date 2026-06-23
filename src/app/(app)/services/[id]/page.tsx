@@ -45,6 +45,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
     allowedRoleKeys: parseJson(latest?.allowedRoleKeys, []),
     checklistTemplateId: latest?.checklistTemplateId ?? "",
     payrollRuleConfig: parseJson(latest?.payrollRuleConfig, {}),
+    automationRules: parseJson(latest?.automationRules, []),
   };
 
   const updateBound = updateService.bind(null, service.id);

@@ -15,6 +15,14 @@ interface TaskTemplate {
   requiredRoleKey?: string;
   photosRequired?: boolean;
 }
+interface AutomationRule {
+  event: string;
+  action: string;
+  taskName?: string;
+  requiredRoleKey?: string;
+  followupDays?: number;
+  issueTitle?: string;
+}
 
 export interface ServiceInitial {
   name: string;
@@ -33,6 +41,7 @@ export interface ServiceInitial {
   allowedRoleKeys: string[];
   checklistTemplateId: string;
   payrollRuleConfig: Record<string, number | string>;
+  automationRules: AutomationRule[];
 }
 
 const PRICING_LABELS: Record<string, string> = {
@@ -89,6 +98,7 @@ export default function ServiceBuilderForm({
       allowedRoleKeys: s.allowedRoleKeys,
       checklistTemplateId: s.checklistTemplateId || null,
       payrollRuleConfig: s.payrollRuleConfig,
+      automationRules: s.automationRules.filter((r) => r.event && r.action),
     };
     formData.set("payload", JSON.stringify(payload));
     action(formData);
@@ -288,6 +298,38 @@ export default function ServiceBuilderForm({
           </div>
         </div>
       </section>
+
+      {/* Automation rules */}
+      <Repeater
+        title="Automation Rules (IF event THEN action)"
+        items={s.automationRules}
+        onChange={(v) => set("automationRules", v as AutomationRule[])}
+        empty={{ event: "service_line_added", action: "create_task", taskName: "" }}
+        render={(item, update) => (
+          <>
+            <span className="text-xs text-gray-500">IF</span>
+            <select className="input" value={item.event} onChange={(e) => update({ ...item, event: e.target.value })}>
+              <option value="service_line_added">service line added</option>
+              <option value="task_completed">task completed</option>
+            </select>
+            <span className="text-xs text-gray-500">THEN</span>
+            <select className="input" value={item.action} onChange={(e) => update({ ...item, action: e.target.value })}>
+              <option value="create_task">create task</option>
+              <option value="create_followup">create follow-up</option>
+              <option value="create_issue">create issue</option>
+            </select>
+            {(item.action === "create_task" || item.action === "create_followup") && (
+              <input className="input" placeholder="task name" value={item.taskName ?? ""} onChange={(e) => update({ ...item, taskName: e.target.value })} />
+            )}
+            {item.action === "create_followup" && (
+              <input className="input w-24" type="number" placeholder="days" value={item.followupDays ?? ""} onChange={(e) => update({ ...item, followupDays: parseInt(e.target.value, 10) || 0 })} />
+            )}
+            {item.action === "create_issue" && (
+              <input className="input" placeholder="issue title" value={item.issueTitle ?? ""} onChange={(e) => update({ ...item, issueTitle: e.target.value })} />
+            )}
+          </>
+        )}
+      />
 
       <div className="flex justify-end gap-2">
         <button type="submit" className="btn-primary">Save service</button>

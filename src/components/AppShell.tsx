@@ -11,9 +11,13 @@ const NAV: { href: string; label: string; section: Section }[] = [
   { href: "/properties", label: "Properties", section: "properties" },
   { href: "/laundry", label: "Laundry", section: "laundry" },
   { href: "/suppliers", label: "Suppliers", section: "suppliers" },
+  { href: "/inventory", label: "Inventory", section: "inventory" },
   { href: "/issues", label: "Issues", section: "issues" },
+  { href: "/qc", label: "Quality Control", section: "qc" },
   { href: "/staff", label: "Staff", section: "staff" },
+  { href: "/payroll", label: "Payroll", section: "payroll" },
   { href: "/invoices", label: "Invoices", section: "invoices" },
+  { href: "/reports", label: "Reports", section: "reports" },
   { href: "/settings", label: "Settings", section: "settings" },
 ];
 

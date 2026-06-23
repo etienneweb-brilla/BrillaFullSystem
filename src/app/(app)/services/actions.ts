@@ -25,6 +25,7 @@ export interface ServiceFormPayload {
   allowedRoleKeys: string[];
   checklistTemplateId?: string | null;
   payrollRuleConfig: Record<string, unknown>;
+  automationRules?: unknown[];
 }
 
 function parsePayload(formData: FormData): ServiceFormPayload {
@@ -45,6 +46,7 @@ function versionData(p: ServiceFormPayload, version: number) {
     defaultPrice: p.defaultPrice ?? null,
     formFields: JSON.stringify(p.formFields ?? []),
     payrollRuleConfig: JSON.stringify(p.payrollRuleConfig ?? {}),
+    automationRules: JSON.stringify(p.automationRules ?? []),
     allowedRoleKeys: JSON.stringify(p.allowedRoleKeys ?? []),
     checklistTemplateId: p.checklistTemplateId ?? null,
     taskTemplateRows: {
@@ -150,6 +152,7 @@ export async function cloneService(formData: FormData) {
               defaultPrice: v.defaultPrice,
               formFields: v.formFields,
               payrollRuleConfig: v.payrollRuleConfig,
+              automationRules: v.automationRules,
               allowedRoleKeys: v.allowedRoleKeys,
               checklistTemplateId: v.checklistTemplateId,
               taskTemplateRows: {

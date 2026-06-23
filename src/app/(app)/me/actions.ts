@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { saveUpload } from "@/lib/uploads";
 import { writeAudit } from "@/lib/audit";
+import { planAutomations, parseRules } from "@/lib/automation";
 
 async function myProfileId(): Promise<string | null> {
   const user = await requireUser();
@@ -72,7 +73,7 @@ export async function completeTask(formData: FormData) {
   if (!staffId || !taskId) return;
   const task = await db.task.findFirst({
     where: { id: taskId, assignedStaffId: staffId },
-    include: { attachments: true, serviceLine: { include: { tasks: true } } },
+    include: { attachments: true, serviceLine: { include: { tasks: true, serviceVersion: true } } },
   });
   if (!task) return;
 
@@ -93,6 +94,8 @@ export async function completeTask(formData: FormData) {
     if (k.startsWith("check_")) results.push({ itemId: k.slice(6), done: v === "on" });
   }
 
+  // Tasks that capture photos/signatures go into the QC review queue (spec §19).
+  const needsReview = task.photosRequired || task.signatureRequired;
   await db.task.update({
     where: { id: taskId },
     data: {
@@ -100,6 +103,7 @@ export async function completeTask(formData: FormData) {
       completedAt: new Date(),
       notes: notes || null,
       checklistResults: JSON.stringify(results),
+      qualityStatus: needsReview ? "pending_review" : null,
     },
   });
 
@@ -108,6 +112,26 @@ export async function completeTask(formData: FormData) {
     const remaining = task.serviceLine.tasks.filter((t) => t.id !== taskId && t.status !== "completed");
     if (remaining.length === 0) {
       await db.serviceLine.update({ where: { id: task.serviceLineId }, data: { status: "completed" } });
+    }
+  }
+  // Run task_completed automations from the service version (spec §5.8).
+  if (task.serviceLine?.serviceVersion) {
+    const planned = planAutomations(parseRules(task.serviceLine.serviceVersion.automationRules), { event: "task_completed" });
+    for (const a of planned) {
+      if (a.type === "create_task" || a.type === "create_followup") {
+        await db.task.create({
+          data: {
+            workOrderId: task.workOrderId,
+            serviceLineId: task.serviceLineId,
+            name: a.taskName ?? "Follow-up",
+            requiredRoleKey: a.requiredRoleKey ?? null,
+            status: "pending",
+            dueAt: a.dueInDays ? new Date(Date.now() + a.dueInDays * 86400000) : null,
+          },
+        });
+      } else if (a.type === "create_issue") {
+        await db.issue.create({ data: { type: "general", title: a.issueTitle ?? "Automated issue", workOrderId: task.workOrderId } });
+      }
     }
   }
   await writeAudit({ actorId: (await requireUser()).id, entityType: "task", entityId: taskId, action: "status_change", newValue: { status: "completed" } });

@@ -18,6 +18,9 @@ export const SECTIONS = [
   "laundry", // laundry batches, items, manifests, return verification
   "suppliers", // supplier management
   "issues", // issue management
+  "inventory", // stock management
+  "qc", // quality-control review queue
+  "recurring", // recurring work order schedules
   "mytasks", // staff personal task dashboard
 ] as const;
 export type Section = (typeof SECTIONS)[number];

@@ -23,6 +23,7 @@ const ROLES: {
       laundry: true,
       suppliers: true,
       issues: true,
+      qc: true,
       mytasks: true,
       reports: true,
     },
@@ -345,6 +346,21 @@ async function main() {
     create: { userId: driver.id, employeeType: "full-time", transportAvailable: true, skills: JSON.stringify(["driving_licence"]) },
     update: {},
   });
+
+  // --- Phase 3: inventory categories + items ---
+  const invCats = ["Chemicals", "Equipment", "Consumables"];
+  for (const name of invCats) {
+    await db.inventoryCategory.upsert({ where: { name }, create: { name }, update: {} });
+  }
+  const chemCat = await db.inventoryCategory.findUnique({ where: { name: "Chemicals" } });
+  if ((await db.inventoryItem.count()) === 0) {
+    await db.inventoryItem.create({
+      data: { name: "All-purpose cleaner", categoryId: chemCat?.id, unit: "litre", stockLevel: 24, lowStockThreshold: 10, cost: 8 },
+    });
+    await db.inventoryItem.create({
+      data: { name: "Microfibre cloths", unit: "pack", stockLevel: 6, lowStockThreshold: 8, cost: 12 },
+    });
+  }
 
   console.log("Seed complete.");
   console.log("  Admin login:   admin@brilla.local / admin123");

@@ -13,6 +13,9 @@ export default async function WorkOrdersPage() {
 
   return (
     <div>
+      <div className="mb-2 flex justify-end">
+        <Link href="/workorders/recurring" className="text-sm text-brand-dark hover:underline">Recurring schedules →</Link>
+      </div>
       <PageHeader title="Work Orders" action={{ href: "/workorders/new", label: "+ New work order" }} />
       {workOrders.length === 0 ? (
         <EmptyState message="No work orders yet." />

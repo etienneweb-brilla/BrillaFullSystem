@@ -95,6 +95,8 @@ model StaffProfile {
   assignedTasks        Task[]
   timeEntries          TimeEntry[]
   laundryBatches       LaundryBatch[] // batches where this staff member is the assigned driver
+  payrollEntries       PayrollEntry[]
+  inventoryUsage       InventoryUsage[]
 }
 
 // Which services a staff member may be assigned to (spec 5.9 / 10.2).
@@ -400,7 +402,8 @@ model ServiceLine {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tasks Task[]
+  tasks          Task[]
+  inventoryUsage InventoryUsage[]
 }
 
 model Task {
@@ -433,6 +436,12 @@ model Task {
   notes            String?
   signatureData    String?
 
+  // Quality control (spec §19)
+  qualityStatus String? // null | pending_review | approved | rejected | revisit
+  reviewNotes   String?
+  reviewedById  String?
+  isRevisit     Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -463,7 +472,7 @@ model PayrollRule {
   updatedAt         DateTime     @updatedAt
 }
 
-// Payroll periods — locking is a Phase 3 feature; lockedAt placeholder included now.
+// Payroll periods — reviewable then lockable (spec §12.4).
 model PayrollPeriod {
   id         String    @id @default(cuid())
   label      String
@@ -472,6 +481,25 @@ model PayrollPeriod {
   lockedAt   DateTime?
   lockedById String?
   createdAt  DateTime  @default(now())
+
+  entries PayrollEntry[]
+}
+
+// One computed pay line for a staff member in a period. Corrections after locking
+// are recorded as separate adjustment entries (isAdjustment = true).
+model PayrollEntry {
+  id           String        @id @default(cuid())
+  periodId     String
+  period       PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  staffId      String
+  staff        StaffProfile  @relation(fields: [staffId], references: [id])
+  base         Float         @default(0)
+  commission   Float         @default(0)
+  total        Float         @default(0)
+  computedFrom String        @default("{}") // JSON: line ids + breakdown
+  isAdjustment Boolean       @default(false)
+  note         String?
+  createdAt    DateTime      @default(now())
 }
 
 // ---------------------------------------------------------------------------
@@ -667,4 +695,65 @@ model LaundryBatchItem {
   damagedQty    Int          @default(0)
   // missing is derived: max(collected - returned - damaged, 0)
   createdAt     DateTime     @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// PHASE 3: INVENTORY & RECURRING (spec §26, §22)
+// ---------------------------------------------------------------------------
+
+model InventoryCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  items InventoryItem[]
+}
+
+model InventoryItem {
+  id                String             @id @default(cuid())
+  name              String
+  categoryId        String?
+  category          InventoryCategory? @relation(fields: [categoryId], references: [id])
+  unit              String             @default("unit") // e.g. unit, litre, box
+  stockLevel        Float              @default(0)
+  lowStockThreshold Float              @default(0)
+  cost              Float              @default(0)
+  supplierId        String?
+  assignedTo        String? // staff/vehicle (free text for now)
+  active            Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  usage InventoryUsage[]
+}
+
+model InventoryUsage {
+  id            String        @id @default(cuid())
+  itemId        String
+  item          InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  qty           Float
+  serviceLineId String?
+  serviceLine   ServiceLine?  @relation(fields: [serviceLineId], references: [id])
+  staffId       String?
+  staff         StaffProfile? @relation(fields: [staffId], references: [id])
+  note          String?
+  createdAt     DateTime      @default(now())
+}
+
+// Recurring schedule that materialises new Work Orders (spec §22).
+model RecurringWorkOrder {
+  id           String    @id @default(cuid())
+  label        String
+  clientId     String
+  propertyId   String
+  // JSON template of service lines to create: [{ serviceId, inputs, fulfilmentMode }]
+  template     String    @default("[]")
+  frequency    String    @default("weekly") // daily|weekly|biweekly|monthly|everyXDays
+  intervalDays Int       @default(0) // used when frequency = everyXDays
+  daysOfWeek   String    @default("[]") // JSON array 0-6 (future use)
+  nextRunAt    DateTime
+  lastRunAt    DateTime?
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }

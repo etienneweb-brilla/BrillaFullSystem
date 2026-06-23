@@ -21,6 +21,7 @@ const EMPTY: ServiceInitial = {
   allowedRoleKeys: [],
   checklistTemplateId: "",
   payrollRuleConfig: {},
+  automationRules: [],
 };
 
 export default async function NewServicePage() {

@@ -16,6 +16,7 @@ import {
   type PricingRules,
   type PricingInputs,
 } from "@/lib/pricing";
+import { planAutomations, parseRules } from "@/lib/automation";
 
 export async function createWorkOrder(formData: FormData) {
   const user = await requireSection("workorders");
@@ -114,6 +115,30 @@ export async function addServiceLine(workOrderId: string, formData: FormData) {
     },
   });
   await writeAudit({ actorId: user.id, entityType: "serviceline", entityId: line.id, action: "create", newValue: { serviceId, price } });
+
+  // Run automation rules for this service version (spec §5.8).
+  const planned = planAutomations(parseRules(version.automationRules), {
+    event: "service_line_added",
+    fields: inputs as Record<string, unknown>,
+  });
+  for (const a of planned) {
+    if (a.type === "create_task" || a.type === "create_followup") {
+      await db.task.create({
+        data: {
+          workOrderId,
+          serviceLineId: line.id,
+          name: a.taskName ?? "Automated task",
+          requiredRoleKey: a.requiredRoleKey ?? null,
+          status: "pending",
+          dueAt: a.dueInDays ? new Date(Date.now() + a.dueInDays * 86400000) : wo.scheduledAt,
+        },
+      });
+    } else if (a.type === "create_issue") {
+      await db.issue.create({
+        data: { type: "general", title: a.issueTitle ?? "Automated issue", workOrderId, createdById: user.id },
+      });
+    }
+  }
   revalidatePath(`/workorders/${workOrderId}`);
 }
 
