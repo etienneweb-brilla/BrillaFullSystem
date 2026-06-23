@@ -24,6 +24,9 @@ export async function createRecurring(formData: FormData) {
     fulfilmentMode: "internal",
   }));
 
+  const endRaw = String(formData.get("endDate") ?? "");
+  const daysOfWeek = formData.getAll("daysOfWeek").map((d) => parseInt(String(d), 10)).filter((n) => !isNaN(n));
+
   await db.recurringWorkOrder.create({
     data: {
       label,
@@ -32,6 +35,9 @@ export async function createRecurring(formData: FormData) {
       template: JSON.stringify(template),
       frequency: String(formData.get("frequency") ?? "weekly"),
       intervalDays: parseInt(String(formData.get("intervalDays") ?? "0"), 10) || 0,
+      daysOfWeek: JSON.stringify(daysOfWeek),
+      startDate: new Date(start),
+      endDate: endRaw ? new Date(endRaw) : null,
       nextRunAt: new Date(start),
     },
   });
@@ -54,12 +60,18 @@ export async function generateDue() {
   const due = await db.recurringWorkOrder.findMany({ where: { active: true, nextRunAt: { lte: now } } });
   let created = 0;
   for (const r of due) {
+    // Respect the schedule's end date.
+    if (r.endDate && r.nextRunAt > r.endDate) {
+      await db.recurringWorkOrder.update({ where: { id: r.id }, data: { active: false } });
+      continue;
+    }
     const template = parseJson<TemplateLine[]>(r.template, []);
     if (template.length === 0) continue;
     await createWorkOrderFromTemplate(r.clientId, r.propertyId, template, r.nextRunAt);
+    const daysOfWeek = parseJson<number[]>(r.daysOfWeek, []);
     await db.recurringWorkOrder.update({
       where: { id: r.id },
-      data: { lastRunAt: now, nextRunAt: advanceDate(r.nextRunAt, r.frequency, r.intervalDays) },
+      data: { lastRunAt: now, nextRunAt: advanceDate(r.nextRunAt, r.frequency, r.intervalDays, daysOfWeek) },
     });
     created++;
   }

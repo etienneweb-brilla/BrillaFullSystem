@@ -155,7 +155,13 @@ export function applyVat(amount: number, vat: VatSettings): VatBreakdown {
 // Very small, safe arithmetic formula evaluator. Supports + - * / ( ) and the
 // variables: rate, unitPrice, manpower, hours, quantity, itemQuantity, rooms.
 // No access to JS globals — only the whitelisted variable names and numbers.
-export function evalFormula(formula: string, config: PricingConfig, inputs: PricingInputs): number {
+export function evalFormula(
+  formula: string,
+  config: PricingConfig,
+  inputs: PricingInputs,
+  // Admin-defined reusable variables (Phase 4 part 6) — e.g. bedrooms, poolSize.
+  extraVars?: Record<string, number>,
+): number {
   const vars: Record<string, number> = {
     rate: num(config.rate),
     unitPrice: num(config.unitPrice),
@@ -164,6 +170,9 @@ export function evalFormula(formula: string, config: PricingConfig, inputs: Pric
     quantity: num(inputs.quantity),
     itemQuantity: num(inputs.itemQuantity),
     rooms: num(inputs.rooms),
+    // property attributes are available by their key as well
+    ...Object.fromEntries(Object.entries(inputs.attributes ?? {}).map(([k, v]) => [k, num(v)])),
+    ...Object.fromEntries(Object.entries(extraVars ?? {}).map(([k, v]) => [k, num(v)])),
   };
   // Only allow numbers, the variable names, whitespace and arithmetic operators.
   const allowed = /^[\s\d.+\-*/()a-zA-Z_]+$/;
@@ -183,4 +192,39 @@ export function evalFormula(formula: string, config: PricingConfig, inputs: Pric
 
 export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+// Configurable pricing inputs (Phase 4 part 5). Each variable carries its own
+// default/min/max/required and whether it can be edited on the work order.
+export interface PricingVariableDef {
+  key: string;
+  label: string;
+  default?: number;
+  min?: number;
+  max?: number;
+  editableInWorkOrder?: boolean;
+  required?: boolean;
+}
+
+/**
+ * Validate work-order pricing inputs against the service's variable definitions.
+ * Returns an array of human-readable errors (empty = valid).
+ */
+export function validatePricingInputs(
+  defs: PricingVariableDef[],
+  values: Record<string, number | undefined>,
+): string[] {
+  const errors: string[] = [];
+  for (const d of defs) {
+    const raw = values[d.key];
+    const provided = raw !== undefined && raw !== null && Number.isFinite(raw);
+    if (!provided) {
+      if (d.required) errors.push(`${d.label} is required.`);
+      continue;
+    }
+    const v = raw as number;
+    if (d.min != null && v < d.min) errors.push(`${d.label} must be at least ${d.min}.`);
+    if (d.max != null && v > d.max) errors.push(`${d.label} must be at most ${d.max}.`);
+  }
+  return errors;
 }

@@ -28,7 +28,12 @@ export default async function MyTasksPage() {
   return (
     <div className="mx-auto max-w-xl">
       <h1 className="mb-1 text-2xl font-bold text-gray-900">Hi {user.name.split(" ")[0]}</h1>
-      <p className="mb-5 text-sm text-gray-500">Your tasks</p>
+      <p className="mb-3 text-sm text-gray-500">Your tasks</p>
+      {user.roleKeys.includes("driver") && (
+        <a href="/driver" className="mb-4 inline-block text-sm font-medium text-brand-dark hover:underline">
+          Open driver dashboard →
+        </a>
+      )}
 
       {/* Clock in/out — big buttons */}
       <div className="mb-6">

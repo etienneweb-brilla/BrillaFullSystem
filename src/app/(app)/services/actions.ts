@@ -26,6 +26,10 @@ export interface ServiceFormPayload {
   checklistTemplateId?: string | null;
   payrollRuleConfig: Record<string, unknown>;
   automationRules?: unknown[];
+  pricingVariables?: unknown[];
+  recommendedFrequencies?: string[];
+  internalNotes?: string;
+  clientNotes?: string;
 }
 
 function parsePayload(formData: FormData): ServiceFormPayload {
@@ -43,6 +47,7 @@ function versionData(p: ServiceFormPayload, version: number) {
     pricingType: p.pricingType,
     pricingConfig: JSON.stringify(p.pricingConfig ?? {}),
     pricingRules: JSON.stringify(p.pricingRules ?? {}),
+    pricingVariables: JSON.stringify(p.pricingVariables ?? []),
     defaultPrice: p.defaultPrice ?? null,
     formFields: JSON.stringify(p.formFields ?? []),
     payrollRuleConfig: JSON.stringify(p.payrollRuleConfig ?? {}),
@@ -74,6 +79,9 @@ export async function createService(formData: FormData) {
       description: p.description || null,
       isPublic: p.isPublic,
       active: p.active,
+      internalNotes: p.internalNotes || null,
+      clientNotes: p.clientNotes || null,
+      recommendedFrequencies: JSON.stringify(p.recommendedFrequencies ?? []),
       versions: { create: versionData(p, 1) },
     },
   });
@@ -106,6 +114,9 @@ export async function updateService(serviceId: string, formData: FormData) {
         description: p.description || null,
         isPublic: p.isPublic,
         active: p.active,
+        internalNotes: p.internalNotes || null,
+        clientNotes: p.clientNotes || null,
+        recommendedFrequencies: JSON.stringify(p.recommendedFrequencies ?? []),
         versions: { create: versionData(p, nextVersion) },
       },
     }),
@@ -149,6 +160,7 @@ export async function cloneService(formData: FormData) {
               pricingType: v.pricingType,
               pricingConfig: v.pricingConfig,
               pricingRules: v.pricingRules,
+              pricingVariables: v.pricingVariables,
               defaultPrice: v.defaultPrice,
               formFields: v.formFields,
               payrollRuleConfig: v.payrollRuleConfig,

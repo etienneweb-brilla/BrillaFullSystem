@@ -15,6 +15,8 @@ import {
   type PricingConfig,
   type PricingRules,
   type PricingInputs,
+  type PricingVariableDef,
+  validatePricingInputs,
 } from "@/lib/pricing";
 import { planAutomations, parseRules } from "@/lib/automation";
 
@@ -64,6 +66,20 @@ export async function addServiceLine(workOrderId: string, formData: FormData) {
 
   // Gather pricing inputs from the form + property attributes.
   const attributes = parseJson<Record<string, number>>(wo.property.fieldValues, {});
+
+  // Configurable pricing inputs (Part 5): validate against the service's variable defs.
+  const pvars = parseJson<PricingVariableDef[]>(version.pricingVariables, []);
+  if (pvars.length > 0) {
+    const values: Record<string, number | undefined> = {};
+    for (const v of pvars) values[v.key] = numOrUndef(formData.get(v.key));
+    const errors = validatePricingInputs(pvars, values);
+    if (errors.length > 0) {
+      redirect(`/workorders/${workOrderId}?error=${encodeURIComponent(errors.join(" "))}`);
+    }
+    // Make custom variables available to formulas via attributes.
+    for (const v of pvars) if (values[v.key] != null) attributes[v.key] = values[v.key] as number;
+  }
+
   const inputs: PricingInputs = {
     hours: numOrUndef(formData.get("hours")),
     manpower: numOrUndef(formData.get("manpower")),

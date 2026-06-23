@@ -22,6 +22,10 @@ const EMPTY: ServiceInitial = {
   checklistTemplateId: "",
   payrollRuleConfig: {},
   automationRules: [],
+  pricingVariables: [],
+  recommendedFrequencies: [],
+  internalNotes: "",
+  clientNotes: "",
 };
 
 export default async function NewServicePage() {

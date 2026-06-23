@@ -11,16 +11,19 @@ import {
   deleteClientType,
   addPropertyField,
   deletePropertyField,
+  addPricingVariable,
+  deletePricingVariable,
 } from "./actions";
 
 export default async function SettingsPage() {
   await requireSection("settings");
-  const [company, finance, categories, clientTypes, propFields] = await Promise.all([
+  const [company, finance, categories, clientTypes, propFields, pricingVars] = await Promise.all([
     getCompanySettings(),
     getFinanceSettings(),
     db.serviceCategory.findMany({ orderBy: { name: "asc" } }),
     db.clientType.findMany({ orderBy: { name: "asc" } }),
     db.fieldDefinition.findMany({ where: { scope: "property", ownerId: null }, orderBy: { sortOrder: "asc" } }),
+    db.pricingVariable.findMany({ orderBy: { label: "asc" } }),
   ]);
 
   return (
@@ -145,6 +148,52 @@ export default async function SettingsPage() {
             </select>
           </div>
           <button className="btn-secondary" type="submit">Add field</button>
+        </form>
+      </section>
+
+      {/* Formula variables (Part 6) */}
+      <section className="card mt-6 p-6">
+        <h2 className="mb-1 font-semibold text-gray-900">Pricing / Formula Variables</h2>
+        <p className="mb-4 text-sm text-gray-500">
+          Reusable variables usable in formula pricing (e.g. bedrooms × rate). “Property attribute” pulls
+          its value from each property; “input” is entered on the work order.
+        </p>
+        <ul className="mb-4 divide-y divide-gray-100">
+          {pricingVars.map((v) => (
+            <li key={v.id} className="flex items-center justify-between py-2 text-sm">
+              <span>
+                <span className="font-medium">{v.label}</span>{" "}
+                <span className="text-gray-400">({v.key} · {v.source}{v.attributeKey ? ` → ${v.attributeKey}` : ""})</span>
+              </span>
+              <form action={deletePricingVariable}>
+                <input type="hidden" name="id" value={v.id} />
+                <button className="text-xs text-red-600 hover:underline" type="submit">Remove</button>
+              </form>
+            </li>
+          ))}
+          {pricingVars.length === 0 && <li className="py-2 text-sm text-gray-400">None yet.</li>}
+        </ul>
+        <form action={addPricingVariable} className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="label">Key</label>
+            <input name="key" placeholder="bedrooms" className="input" />
+          </div>
+          <div>
+            <label className="label">Label</label>
+            <input name="label" placeholder="Bedrooms" className="input" />
+          </div>
+          <div>
+            <label className="label">Source</label>
+            <select name="source" className="input">
+              <option value="input">input</option>
+              <option value="propertyAttribute">property attribute</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Attribute key</label>
+            <input name="attributeKey" placeholder="bedrooms" className="input" />
+          </div>
+          <button className="btn-secondary" type="submit">Add variable</button>
         </form>
       </section>
     </div>

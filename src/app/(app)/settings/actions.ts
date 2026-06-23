@@ -83,3 +83,26 @@ export async function deletePropertyField(formData: FormData) {
   await db.fieldDefinition.delete({ where: { id } }).catch(() => {});
   revalidatePath("/settings");
 }
+
+// Reusable pricing/formula variables (Phase 4 part 6).
+export async function addPricingVariable(formData: FormData) {
+  await requireSection("settings");
+  const key = String(formData.get("key") ?? "").trim();
+  const label = String(formData.get("label") ?? "").trim();
+  const source = String(formData.get("source") ?? "input");
+  const attributeKey = String(formData.get("attributeKey") ?? "").trim() || null;
+  if (!key || !label) return;
+  await db.pricingVariable.upsert({
+    where: { key },
+    create: { key, label, source, attributeKey },
+    update: { label, source, attributeKey },
+  });
+  revalidatePath("/settings");
+}
+
+export async function deletePricingVariable(formData: FormData) {
+  await requireSection("settings");
+  const id = String(formData.get("id"));
+  await db.pricingVariable.delete({ where: { id } }).catch(() => {});
+  revalidatePath("/settings");
+}

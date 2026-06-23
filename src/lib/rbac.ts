@@ -5,6 +5,7 @@ import { requireUser } from "./auth";
 // Section keys gate access to areas of the app. Roles carry a permissions JSON
 // (configurable in Settings) mapping these keys to booleans.
 export const SECTIONS = [
+  "calendar",
   "dashboard",
   "workorders",
   "services",
@@ -46,6 +47,8 @@ export async function requireSection(section: Section): Promise<SessionUser> {
 
 /** Where a user should land after login, based on their permissions. */
 export function homePathFor(user: SessionUser): string {
+  // Calendar / Dispatch is the primary daily operational screen for admin & supervisors.
+  if (can(user, "calendar")) return "/calendar";
   if (can(user, "dashboard")) return "/dashboard";
   if (can(user, "mytasks")) return "/me";
   return "/login";

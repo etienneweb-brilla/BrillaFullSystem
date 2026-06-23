@@ -21,8 +21,8 @@ export default async function ReportsPage() {
       },
     }),
     db.invoice.findMany({ include: { client: true } }),
-    db.task.findMany(),
-    db.laundryBatch.findMany({ include: { items: true } }),
+    db.task.findMany({ include: { workOrder: { include: { property: true } }, assignedStaff: { include: { user: true } } } }),
+    db.laundryBatch.findMany({ include: { items: { include: { laundryItem: true } }, supplier: true } }),
   ]);
 
   // Attribute labour (commission) to each line so profit includes staff pay.
@@ -54,6 +54,58 @@ export default async function ReportsPage() {
     (l) => l.assignedStaff!.user.name,
   );
   const byMonth = groupSummary(enriched, (l) => monthKey(l.createdAt), (l) => monthKey(l.createdAt));
+
+  // Commission report — per staff, commission earned from their service lines.
+  const commissionByStaff = new Map<string, { name: string; commission: number; lines: number }>();
+  for (const l of lines) {
+    if (!l.assignedStaff) continue;
+    const cfg = parseJson<Partial<PayrollRuleConfig>>(l.payrollConfig, {});
+    const pay = computeServiceLinePay(
+      { payType: (cfg.payType as PayrollRuleConfig["payType"]) ?? "commission", commissionPercent: cfg.commissionPercent ?? 0 },
+      { serviceLinePrice: l.price },
+    );
+    const k = l.assignedStaffId!;
+    const cur2 = commissionByStaff.get(k) ?? { name: l.assignedStaff.user.name, commission: 0, lines: 0 };
+    cur2.commission += pay.commission;
+    cur2.lines += 1;
+    commissionByStaff.set(k, cur2);
+  }
+
+  // Staff performance — completed/assigned/overdue task counts per staff.
+  const perfByStaff = new Map<string, { name: string; completed: number; assigned: number; overdue: number }>();
+  for (const t of tasks) {
+    if (!t.assignedStaff) continue;
+    const k = t.assignedStaffId!;
+    const p = perfByStaff.get(k) ?? { name: t.assignedStaff.user.name, completed: 0, assigned: 0, overdue: 0 };
+    if (t.status === "completed") p.completed += 1;
+    else p.assigned += 1;
+    if (t.status !== "completed" && t.dueAt && t.dueAt < new Date()) p.overdue += 1;
+    perfByStaff.set(k, p);
+  }
+
+  const overdueTasks = tasks
+    .filter((t) => t.status !== "completed" && t.status !== "cancelled" && t.dueAt && t.dueAt < new Date())
+    .sort((a, b) => (a.dueAt!.getTime() - b.dueAt!.getTime()));
+
+  // Supplier cost report — laundry supplier cost per supplier.
+  const supplierCost = new Map<string, { name: string; cost: number; batches: number }>();
+  for (const b of batches) {
+    if (!b.supplierId) continue;
+    const cost = b.items.reduce((s, it) => s + it.collectedQty * (it.laundryItem?.supplierCost ?? 0), 0);
+    const c = supplierCost.get(b.supplierId) ?? { name: b.supplier?.name ?? "—", cost: 0, batches: 0 };
+    c.cost += cost;
+    c.batches += 1;
+    supplierCost.set(b.supplierId, c);
+  }
+
+  // Laundry discrepancy report — per batch missing/damaged.
+  const discrepancies = batches
+    .map((b) => ({
+      number: b.number,
+      missing: b.items.reduce((q, it) => q + Math.max(it.collectedQty - it.returnedQty - it.damagedQty, 0), 0),
+      damaged: b.items.reduce((q, it) => q + it.damagedQty, 0),
+    }))
+    .filter((d) => d.missing > 0 || d.damaged > 0);
 
   const unpaid = invoices.filter((i) => i.status === "unpaid" || i.status === "partial");
   const unpaidTotal = unpaid.reduce((s, i) => s + (i.total - i.amountPaid), 0);
@@ -105,6 +157,41 @@ export default async function ReportsPage() {
         </section>
       </div>
 
+      {/* Commission report */}
+      <SimpleTable
+        title="Commission Report"
+        head={["Staff", "Lines", "Commission"]}
+        rows={[...commissionByStaff.values()].sort((a, b) => b.commission - a.commission).map((c) => [c.name, String(c.lines), money(c.commission, cur)])}
+      />
+
+      {/* Staff performance */}
+      <SimpleTable
+        title="Staff Performance"
+        head={["Staff", "Completed", "Open", "Overdue"]}
+        rows={[...perfByStaff.values()].sort((a, b) => b.completed - a.completed).map((p) => [p.name, String(p.completed), String(p.assigned), String(p.overdue)])}
+      />
+
+      {/* Overdue tasks */}
+      <SimpleTable
+        title="Overdue Tasks"
+        head={["Task", "Property", "Staff", "Due"]}
+        rows={overdueTasks.map((t) => [t.name, t.workOrder.property.name, t.assignedStaff?.user.name ?? "unassigned", t.dueAt ? t.dueAt.toLocaleDateString() : "—"])}
+      />
+
+      {/* Laundry discrepancy report */}
+      <SimpleTable
+        title="Laundry Discrepancy Report"
+        head={["Batch", "Missing", "Damaged"]}
+        rows={discrepancies.map((d) => [d.number, String(d.missing), String(d.damaged)])}
+      />
+
+      {/* Supplier cost report */}
+      <SimpleTable
+        title="Supplier Cost Report"
+        head={["Supplier", "Batches", "Laundry cost"]}
+        rows={[...supplierCost.values()].sort((a, b) => b.cost - a.cost).map((s) => [s.name, String(s.batches), money(s.cost, cur)])}
+      />
+
       {/* Unpaid invoices */}
       <section className="card mb-6">
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
@@ -150,6 +237,30 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="text-gray-500">{label}</dt>
       <dd className="font-medium text-gray-800">{value}</dd>
     </div>
+  );
+}
+
+function SimpleTable({ title, head, rows }: { title: string; head: string[]; rows: string[][] }) {
+  return (
+    <section className="card mb-6">
+      <div className="border-b border-gray-200 px-4 py-3">
+        <h2 className="font-semibold text-gray-900">{title}</h2>
+      </div>
+      {rows.length === 0 ? (
+        <p className="p-4 text-sm text-gray-500">No data yet.</p>
+      ) : (
+        <table className="w-full">
+          <thead className="border-b border-gray-200 bg-gray-50">
+            <tr>{head.map((h, i) => <th key={h} className={`th ${i > 0 ? "text-right" : ""}`}>{h}</th>)}</tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {rows.map((r, ri) => (
+              <tr key={ri}>{r.map((c, ci) => <td key={ci} className={`td ${ci > 0 ? "text-right" : "font-medium"}`}>{c}</td>)}</tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }
 

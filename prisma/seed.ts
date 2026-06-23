@@ -16,6 +16,7 @@ const ROLES: {
     name: "Supervisor",
     isStaffRole: false,
     permissions: {
+      calendar: true,
       dashboard: true,
       workorders: true,
       properties: true,
@@ -235,6 +236,7 @@ async function main() {
       active: true,
       isPublic: true,
       colour: "#0f766e",
+      recommendedFrequencies: JSON.stringify(["weekly", "biweekly"]),
     },
   });
   const version = await db.serviceVersion.create({
@@ -246,6 +248,10 @@ async function main() {
       pricingType: "hourlyManpower",
       pricingConfig: JSON.stringify({ rate: 25, manpower: 2 }),
       pricingRules: JSON.stringify({ minCharge: 80, weekendFee: 20 }),
+      pricingVariables: JSON.stringify([
+        { key: "hours", label: "Hours", default: 3, min: 3, editableInWorkOrder: true, required: true },
+        { key: "manpower", label: "Manpower", default: 1, min: 1, editableInWorkOrder: true, required: true },
+      ]),
       formFields: JSON.stringify([
         { key: "hours", label: "Estimated hours", type: "number", required: true },
         { key: "manpower", label: "Cleaners", type: "number", required: true },
@@ -286,7 +292,7 @@ async function main() {
       paymentTerms: "Due on receipt",
     },
   });
-  await db.property.create({
+  const property = await db.property.create({
     data: {
       clientId: client.id,
       name: "Marina Apartment 1203",
@@ -294,9 +300,64 @@ async function main() {
       propertyType: "Apartment",
       accessInstructions: "Keybox by the door, code in keyboxCode.",
       keyboxCode: "4821",
+      parkingInstructions: "Visitor bay P2-14.",
+      instructions: JSON.stringify({ cleaning: "Pay attention to the balcony glass." }),
       fieldValues: JSON.stringify({ bedrooms: 2, bathrooms: 2, sqm: 95 }),
     },
   });
+
+  // --- Reusable pricing/formula variables (Phase 4 part 6) ---
+  const pvars = [
+    { key: "hours", label: "Hours", source: "input" },
+    { key: "manpower", label: "Manpower", source: "input" },
+    { key: "bedrooms", label: "Bedrooms", source: "propertyAttribute", attributeKey: "bedrooms" },
+    { key: "sqm", label: "Square metres", source: "propertyAttribute", attributeKey: "sqm" },
+  ];
+  for (const v of pvars) {
+    await db.pricingVariable.upsert({ where: { key: v.key }, create: v, update: {} });
+  }
+
+  // --- A scheduled demo work order so the Calendar has content ---
+  if ((await db.workOrder.count()) === 0) {
+    const today = new Date();
+    today.setHours(10, 0, 0, 0);
+    const wo = await db.workOrder.create({
+      data: {
+        number: "WO-DEMO-0001",
+        clientId: client.id,
+        propertyId: property.id,
+        scheduledAt: today,
+        status: "scheduled",
+      },
+    });
+    const line = await db.serviceLine.create({
+      data: {
+        workOrderId: wo.id,
+        serviceVersionId: version.id,
+        inputs: JSON.stringify({ hours: 3, manpower: 2 }),
+        price: 150,
+        status: "assigned",
+        assignedStaffId: cleanerProfile.id,
+        payrollConfig: JSON.stringify({ payType: "hybrid", commissionPercent: 10 }),
+      },
+    });
+    await db.task.create({
+      data: {
+        workOrderId: wo.id,
+        serviceLineId: line.id,
+        name: "Clean property",
+        requiredRoleKey: "cleaner",
+        assignedStaffId: cleanerProfile.id,
+        status: "assigned",
+        checklistTemplateId: checklist.id,
+        photosRequired: true,
+        scheduledStart: today,
+        scheduledEnd: new Date(today.getTime() + 3 * 60 * 60 * 1000),
+        dueAt: today,
+        priority: "normal",
+      },
+    });
+  }
 
   // --- Phase 2: laundry items, supplier, driver ---
   const laundryItems = [

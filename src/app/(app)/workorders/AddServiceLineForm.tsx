@@ -2,10 +2,20 @@
 
 import { useState } from "react";
 
+export interface PricingVarOption {
+  key: string;
+  label: string;
+  default?: number;
+  min?: number;
+  max?: number;
+  required?: boolean;
+}
+
 export interface ServiceOption {
   id: string;
   name: string;
   pricingType: string;
+  pricingVariables?: PricingVarOption[];
 }
 
 export default function AddServiceLineForm({
@@ -18,6 +28,8 @@ export default function AddServiceLineForm({
   const [serviceId, setServiceId] = useState("");
   const selected = services.find((s) => s.id === serviceId);
   const pt = selected?.pricingType;
+  const configuredVars = selected?.pricingVariables ?? [];
+  const hasConfigured = configuredVars.length > 0;
 
   const showHours = pt === "hourly" || pt === "hourlyManpower" || pt === "formula";
   const showManpower = pt === "hourlyManpower" || pt === "formula";
@@ -40,12 +52,41 @@ export default function AddServiceLineForm({
             {services.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.pricingType})</option>)}
           </select>
         </div>
-        {showHours && <NumberField name="hours" label="Hours" />}
-        {showManpower && <NumberField name="manpower" label="Manpower (staff)" />}
-        {showQuantity && <NumberField name="quantity" label="Quantity" />}
-        {showItemQty && <NumberField name="itemQuantity" label="Item quantity" />}
-        {showRooms && <NumberField name="rooms" label="Rooms / areas" />}
-        {showManual && <NumberField name="manualPrice" label="Manual price" step="0.01" />}
+        {/* Configured pricing inputs take precedence (Part 5): default/min/max enforced. */}
+        {hasConfigured
+          ? configuredVars.map((v) => (
+              <div key={v.key}>
+                <label className="label">
+                  {v.label}
+                  {v.required && <span className="text-red-500"> *</span>}
+                  {(v.min != null || v.max != null) && (
+                    <span className="ml-1 text-xs text-gray-400">
+                      ({v.min != null ? `min ${v.min}` : ""}{v.min != null && v.max != null ? ", " : ""}{v.max != null ? `max ${v.max}` : ""})
+                    </span>
+                  )}
+                </label>
+                <input
+                  name={v.key}
+                  type="number"
+                  step="any"
+                  min={v.min}
+                  max={v.max}
+                  defaultValue={v.default ?? ""}
+                  required={v.required}
+                  className="input"
+                />
+              </div>
+            ))
+          : (
+            <>
+              {showHours && <NumberField name="hours" label="Hours" />}
+              {showManpower && <NumberField name="manpower" label="Manpower (staff)" />}
+              {showQuantity && <NumberField name="quantity" label="Quantity" />}
+              {showItemQty && <NumberField name="itemQuantity" label="Item quantity" />}
+              {showRooms && <NumberField name="rooms" label="Rooms / areas" />}
+              {showManual && <NumberField name="manualPrice" label="Manual price" step="0.01" />}
+            </>
+          )}
         <div>
           <label className="label">Fulfilment</label>
           <select name="fulfilmentMode" className="input">

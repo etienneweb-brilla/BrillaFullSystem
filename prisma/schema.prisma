@@ -184,20 +184,22 @@ model FieldDefinition {
 // ---------------------------------------------------------------------------
 
 model Service {
-  id            String           @id @default(cuid())
-  name          String
-  code          String?
-  categoryId    String?
-  category      ServiceCategory? @relation(fields: [categoryId], references: [id])
-  description   String?
-  active        Boolean          @default(true)
-  isPublic      Boolean          @default(false) // public (client-requestable) vs internal
-  icon          String?
-  colour        String?
-  internalNotes String?
-  clientNotes   String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id                     String           @id @default(cuid())
+  name                   String
+  code                   String?
+  categoryId             String?
+  category               ServiceCategory? @relation(fields: [categoryId], references: [id])
+  description            String?
+  active                 Boolean          @default(true)
+  isPublic               Boolean          @default(false) // public (client-requestable) vs internal
+  icon                   String?
+  colour                 String?
+  internalNotes          String?
+  clientNotes            String?
+  // Suggested cadences shown when scheduling — NEVER drive scheduling (Phase 4 part 3).
+  recommendedFrequencies String           @default("[]") // JSON array e.g. ["weekly","monthly"]
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
 
   versions      ServiceVersion[]
   eligibleStaff ServiceEligibility[]
@@ -213,10 +215,12 @@ model ServiceVersion {
   defaultDuration Int? // minutes
 
   // Pricing
-  pricingType   String @default("fixed") // see pricing.ts PRICING_TYPES
-  pricingConfig String @default("{}") // JSON: rate, unitPrice, manpower defaults, formula, attribute key...
-  pricingRules  String @default("{}") // JSON: minCharge, minHours, deposit, urgentFee, weekendFee, travelFee, cancellationFee...
-  defaultPrice  Float? // service default price (priority #1)
+  pricingType      String @default("fixed") // see pricing.ts PRICING_TYPES
+  pricingConfig    String @default("{}") // JSON: rate, unitPrice, manpower defaults, formula, attribute key...
+  pricingRules     String @default("{}") // JSON: minCharge, minHours, deposit, urgentFee, weekendFee, travelFee, cancellationFee...
+  // Configurable pricing inputs (Phase 4 part 5): [{key,label,default,min,max,editableInWorkOrder,required}]
+  pricingVariables String @default("[]")
+  defaultPrice     Float? // service default price (priority #1)
 
   // Form / tasks / checklist / payroll captured as config (snapshotted)
   formFields          String  @default("[]") // JSON array of field definitions for this service
@@ -441,6 +445,11 @@ model Task {
   reviewNotes   String?
   reviewedById  String?
   isRevisit     Boolean @default(false)
+
+  // Calendar / dispatch scheduling (Phase 4)
+  scheduledStart DateTime?
+  scheduledEnd   DateTime?
+  priority       String? // low | normal | high | urgent
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -669,6 +678,7 @@ model LaundryBatch {
   supplier       Supplier?     @relation(fields: [supplierId], references: [id])
   driverStaffId  String?
   driver         StaffProfile? @relation(fields: [driverStaffId], references: [id])
+  cleanerStaffId String? // cleaner who counted/collected the linen (Phase 4 part 7)
   workOrderId    String?
   workOrder      WorkOrder?    @relation(fields: [workOrderId], references: [id])
   collectionDate DateTime?
@@ -748,12 +758,25 @@ model RecurringWorkOrder {
   propertyId   String
   // JSON template of service lines to create: [{ serviceId, inputs, fulfilmentMode }]
   template     String    @default("[]")
-  frequency    String    @default("weekly") // daily|weekly|biweekly|monthly|everyXDays
+  frequency    String    @default("weekly") // daily|weekly|biweekly|monthly|everyXDays|daysOfWeek
   intervalDays Int       @default(0) // used when frequency = everyXDays
-  daysOfWeek   String    @default("[]") // JSON array 0-6 (future use)
+  daysOfWeek   String    @default("[]") // JSON array of weekday numbers 0-6 (Sun-Sat)
+  startDate    DateTime?
+  endDate      DateTime?
   nextRunAt    DateTime
   lastRunAt    DateTime?
   active       Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+
+// Reusable pricing/formula variable catalogue (Phase 4 part 6). Admin-created; usable in
+// formula pricing. `source` decides where a value comes from at quote time.
+model PricingVariable {
+  id           String   @id @default(cuid())
+  key          String   @unique // identifier usable in formulas, e.g. "bedrooms"
+  label        String
+  source       String   @default("input") // input | propertyAttribute
+  attributeKey String? // when source = propertyAttribute, the Property.fieldValues key
+  createdAt    DateTime @default(now())
 }

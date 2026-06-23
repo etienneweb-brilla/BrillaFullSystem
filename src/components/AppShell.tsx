@@ -4,6 +4,7 @@ import { can, type Section } from "@/lib/rbac";
 import { logoutAction } from "@/app/actions";
 
 const NAV: { href: string; label: string; section: Section }[] = [
+  { href: "/calendar", label: "Calendar / Dispatch", section: "calendar" },
   { href: "/dashboard", label: "Dashboard", section: "dashboard" },
   { href: "/workorders", label: "Work Orders", section: "workorders" },
   { href: "/services", label: "Service Builder", section: "services" },

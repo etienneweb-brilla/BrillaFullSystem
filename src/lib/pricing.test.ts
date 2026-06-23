@@ -5,7 +5,37 @@ import {
   resolvePrice,
   applyVat,
   evalFormula,
+  validatePricingInputs,
 } from "./pricing";
+
+describe("validatePricingInputs (configurable min/max/required)", () => {
+  const defs = [
+    { key: "hours", label: "Hours", min: 3, required: true },
+    { key: "manpower", label: "Manpower", min: 1, max: 5 },
+  ];
+  it("passes valid values", () => {
+    expect(validatePricingInputs(defs, { hours: 3, manpower: 2 })).toEqual([]);
+  });
+  it("rejects below minimum", () => {
+    expect(validatePricingInputs(defs, { hours: 2, manpower: 2 })[0]).toMatch(/at least 3/);
+  });
+  it("rejects above maximum", () => {
+    expect(validatePricingInputs(defs, { hours: 4, manpower: 9 })[0]).toMatch(/at most 5/);
+  });
+  it("flags a missing required value", () => {
+    expect(validatePricingInputs(defs, { manpower: 2 })[0]).toMatch(/required/);
+  });
+});
+
+describe("evalFormula with dynamic variables", () => {
+  it("uses property attributes by their key", () => {
+    // bedrooms * rate where bedrooms comes from property attributes
+    expect(evalFormula("bedrooms * rate", { rate: 30 }, { attributes: { bedrooms: 3 } })).toBe(90);
+  });
+  it("accepts extra variables", () => {
+    expect(evalFormula("poolSize * rate", { rate: 2 }, {}, { poolSize: 50 })).toBe(100);
+  });
+});
 
 describe("computeBasePrice", () => {
   it("fixed price", () => {

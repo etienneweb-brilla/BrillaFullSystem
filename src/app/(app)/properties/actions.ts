@@ -6,6 +6,24 @@ import { requireSection } from "@/lib/rbac";
 import { db } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 
+/**
+ * Save property-specific linen setup (Phase 4 part 7). Stores per-bed item quantities.
+ * Property-specific only — no global bed template. Inputs named linen_<bed>_<itemId>.
+ */
+export async function saveLinenSetup(propertyId: string, formData: FormData) {
+  const user = await requireSection("properties");
+  const setup: Record<string, Record<string, number>> = { single: {}, double: {} };
+  for (const [k, v] of formData.entries()) {
+    const m = /^linen_(single|double)_(.+)$/.exec(k);
+    if (!m) continue;
+    const qty = parseInt(String(v), 10);
+    if (qty > 0) setup[m[1]][m[2]] = qty;
+  }
+  await db.property.update({ where: { id: propertyId }, data: { linenSetup: JSON.stringify(setup) } });
+  await writeAudit({ actorId: user.id, entityType: "property", entityId: propertyId, action: "update", newValue: { linenSetup: true } });
+  revalidatePath(`/properties/${propertyId}`);
+}
+
 export async function createProperty(formData: FormData) {
   const user = await requireSection("properties");
   const clientId = String(formData.get("clientId") ?? "");

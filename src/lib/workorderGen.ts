@@ -83,16 +83,5 @@ export async function createWorkOrderFromTemplate(
   return wo.id;
 }
 
-/** Advance a nextRunAt by the schedule's frequency. */
-export function advanceDate(from: Date, frequency: string, intervalDays: number): Date {
-  const d = new Date(from);
-  switch (frequency) {
-    case "daily": d.setDate(d.getDate() + 1); break;
-    case "weekly": d.setDate(d.getDate() + 7); break;
-    case "biweekly": d.setDate(d.getDate() + 14); break;
-    case "monthly": d.setMonth(d.getMonth() + 1); break;
-    case "everyXDays": d.setDate(d.getDate() + Math.max(intervalDays, 1)); break;
-    default: d.setDate(d.getDate() + 7);
-  }
-  return d;
-}
+// Recurrence date math lives in a client-safe module so the form can preview it too.
+export { advanceDate, previewOccurrences } from "./recurrence";

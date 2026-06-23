@@ -42,7 +42,23 @@ export interface ServiceInitial {
   checklistTemplateId: string;
   payrollRuleConfig: Record<string, number | string>;
   automationRules: AutomationRule[];
+  pricingVariables: PricingVar[];
+  recommendedFrequencies: string[];
+  internalNotes: string;
+  clientNotes: string;
 }
+
+interface PricingVar {
+  key: string;
+  label: string;
+  default?: number | "";
+  min?: number | "";
+  max?: number | "";
+  editableInWorkOrder?: boolean;
+  required?: boolean;
+}
+
+const FREQUENCIES = ["daily", "weekly", "biweekly", "monthly"];
 
 const PRICING_LABELS: Record<string, string> = {
   fixed: "Fixed price",
@@ -63,12 +79,14 @@ export default function ServiceBuilderForm({
   categories,
   roles,
   checklists,
+  formulaVariables,
   action,
 }: {
   initial: ServiceInitial;
   categories: { id: string; name: string }[];
   roles: { key: string; name: string }[];
   checklists: { id: string; name: string }[];
+  formulaVariables?: { key: string; label: string }[];
   action: (formData: FormData) => void;
 }) {
   const [s, setS] = useState<ServiceInitial>(initial);
@@ -99,6 +117,20 @@ export default function ServiceBuilderForm({
       checklistTemplateId: s.checklistTemplateId || null,
       payrollRuleConfig: s.payrollRuleConfig,
       automationRules: s.automationRules.filter((r) => r.event && r.action),
+      pricingVariables: s.pricingVariables
+        .filter((v) => v.key && v.label)
+        .map((v) => ({
+          key: v.key,
+          label: v.label,
+          default: v.default === "" ? undefined : Number(v.default),
+          min: v.min === "" ? undefined : Number(v.min),
+          max: v.max === "" ? undefined : Number(v.max),
+          editableInWorkOrder: !!v.editableInWorkOrder,
+          required: !!v.required,
+        })),
+      recommendedFrequencies: s.recommendedFrequencies,
+      internalNotes: s.internalNotes,
+      clientNotes: s.clientNotes,
     };
     formData.set("payload", JSON.stringify(payload));
     action(formData);
@@ -148,6 +180,36 @@ export default function ServiceBuilderForm({
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input type="checkbox" checked={s.isPublic} onChange={(e) => set("isPublic", e.target.checked)} /> Public (client-requestable)
           </label>
+          <div className="md:col-span-2">
+            <label className="label">Recommended frequencies (suggestions only — never control scheduling)</label>
+            <div className="flex flex-wrap gap-3">
+              {FREQUENCIES.map((f) => (
+                <label key={f} className="flex items-center gap-2 text-sm capitalize text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={s.recommendedFrequencies.includes(f)}
+                    onChange={() =>
+                      set(
+                        "recommendedFrequencies",
+                        s.recommendedFrequencies.includes(f)
+                          ? s.recommendedFrequencies.filter((x) => x !== f)
+                          : [...s.recommendedFrequencies, f],
+                      )
+                    }
+                  />{" "}
+                  {f}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="label">Internal notes</label>
+            <textarea className="input" rows={2} value={s.internalNotes} onChange={(e) => set("internalNotes", e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Client notes</label>
+            <textarea className="input" rows={2} value={s.clientNotes} onChange={(e) => set("clientNotes", e.target.value)} />
+          </div>
         </div>
       </section>
 
@@ -198,9 +260,15 @@ export default function ServiceBuilderForm({
           )}
           {s.pricingType === "formula" && (
             <div className="md:col-span-2">
-              <label className="label">Formula (vars: rate, unitPrice, hours, manpower, quantity, itemQuantity, rooms)</label>
+              <label className="label">Formula</label>
               <input className="input" placeholder="rate * hours * manpower + 10" value={String(s.pricingConfig.formula ?? "")}
                 onChange={(e) => setCfg("formula", e.target.value)} />
+              {formulaVariables && formulaVariables.length > 0 && (
+                <p className="mt-1 text-xs text-gray-400">
+                  Available variables: rate, unitPrice, hours, manpower, quantity, rooms,{" "}
+                  {formulaVariables.map((v) => v.key).join(", ")}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -216,6 +284,29 @@ export default function ServiceBuilderForm({
           ))}
         </div>
       </section>
+
+      {/* Configurable pricing inputs (Part 5) */}
+      <Repeater
+        title="Pricing Inputs (default / min / max, editable on work order)"
+        items={s.pricingVariables}
+        onChange={(v) => set("pricingVariables", v as PricingVar[])}
+        empty={{ key: "", label: "", default: "", min: "", max: "", editableInWorkOrder: true, required: false }}
+        render={(item, update) => (
+          <>
+            <input className="input w-28" placeholder="key" value={item.key} onChange={(e) => update({ ...item, key: e.target.value })} />
+            <input className="input w-32" placeholder="label" value={item.label} onChange={(e) => update({ ...item, label: e.target.value })} />
+            <input className="input w-20" type="number" placeholder="default" value={item.default ?? ""} onChange={(e) => update({ ...item, default: e.target.value === "" ? "" : Number(e.target.value) })} />
+            <input className="input w-16" type="number" placeholder="min" value={item.min ?? ""} onChange={(e) => update({ ...item, min: e.target.value === "" ? "" : Number(e.target.value) })} />
+            <input className="input w-16" type="number" placeholder="max" value={item.max ?? ""} onChange={(e) => update({ ...item, max: e.target.value === "" ? "" : Number(e.target.value) })} />
+            <label className="flex items-center gap-1 text-xs text-gray-600">
+              <input type="checkbox" checked={!!item.editableInWorkOrder} onChange={(e) => update({ ...item, editableInWorkOrder: e.target.checked })} /> editable
+            </label>
+            <label className="flex items-center gap-1 text-xs text-gray-600">
+              <input type="checkbox" checked={!!item.required} onChange={(e) => update({ ...item, required: e.target.checked })} /> required
+            </label>
+          </>
+        )}
+      />
 
       {/* Form fields */}
       <Repeater

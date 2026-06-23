@@ -46,6 +46,10 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
     checklistTemplateId: latest?.checklistTemplateId ?? "",
     payrollRuleConfig: parseJson(latest?.payrollRuleConfig, {}),
     automationRules: parseJson(latest?.automationRules, []),
+    pricingVariables: parseJson(latest?.pricingVariables, []),
+    recommendedFrequencies: parseJson(service.recommendedFrequencies, []),
+    internalNotes: service.internalNotes ?? "",
+    clientNotes: service.clientNotes ?? "",
   };
 
   const updateBound = updateService.bind(null, service.id);

@@ -58,7 +58,16 @@ export default async function WorkOrderDetailPage({
 
   const serviceOptions = services
     .filter((s) => s.versions[0])
-    .map((s) => ({ id: s.id, name: s.name, pricingType: s.versions[0].pricingType }));
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      pricingType: s.versions[0].pricingType,
+      // Editable pricing inputs configured on the service (Part 5).
+      pricingVariables: parseJson<{ key: string; label: string; default?: number; min?: number; max?: number; editableInWorkOrder?: boolean; required?: boolean }[]>(
+        s.versions[0].pricingVariables,
+        [],
+      ).filter((v) => v.editableInWorkOrder),
+    }));
 
   // Totals + profit (spec §27)
   const revenue = wo.serviceLines.reduce((sum, l) => sum + l.price, 0);
@@ -77,9 +86,11 @@ export default async function WorkOrderDetailPage({
       </div>
       <PageHeader title={wo.number} subtitle={`${wo.client.name} · ${wo.property.name} · ${dateTime(wo.scheduledAt)}`} />
 
-      {error === "not_eligible" && (
+      {error && (
         <div className="mb-4 rounded-md bg-red-50 px-4 py-3 text-sm text-red-700">
-          That staff member is not eligible for the selected service. Enable the service on their staff profile first.
+          {error === "not_eligible"
+            ? "That staff member is not eligible for the selected service. Enable the service on their staff profile first."
+            : error}
         </div>
       )}
 
