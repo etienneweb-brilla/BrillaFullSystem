@@ -15,6 +15,9 @@ export const SECTIONS = [
   "invoices",
   "reports",
   "settings",
+  "laundry", // laundry batches, items, manifests, return verification
+  "suppliers", // supplier management
+  "issues", // issue management
   "mytasks", // staff personal task dashboard
 ] as const;
 export type Section = (typeof SECTIONS)[number];

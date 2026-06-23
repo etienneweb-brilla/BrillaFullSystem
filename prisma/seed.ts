@@ -20,6 +20,9 @@ const ROLES: {
       workorders: true,
       properties: true,
       clients: true,
+      laundry: true,
+      suppliers: true,
+      issues: true,
       mytasks: true,
       reports: true,
     },
@@ -294,9 +297,59 @@ async function main() {
     },
   });
 
+  // --- Phase 2: laundry items, supplier, driver ---
+  const laundryItems = [
+    { name: "Flat sheet", category: "Bed linen", clientPrice: 4, supplierCost: 1.5 },
+    { name: "Fitted sheet", category: "Bed linen", clientPrice: 4, supplierCost: 1.5 },
+    { name: "Pillow cover", category: "Bed linen", clientPrice: 2, supplierCost: 0.8 },
+    { name: "Quilt cover", category: "Bed linen", clientPrice: 6, supplierCost: 2.5 },
+    { name: "Large towel", category: "Towels", clientPrice: 3, supplierCost: 1.2 },
+    { name: "Small towel", category: "Towels", clientPrice: 2, supplierCost: 0.8 },
+    { name: "Bath mat", category: "Towels", clientPrice: 2.5, supplierCost: 1 },
+  ];
+  const existingItems = await db.laundryItem.count();
+  if (existingItems === 0) {
+    for (const it of laundryItems) await db.laundryItem.create({ data: it });
+  }
+
+  await db.supplier.upsert({
+    where: { id: "seed-supplier-1" },
+    create: {
+      id: "seed-supplier-1",
+      name: "CrystalClean Laundry Co.",
+      contactPerson: "Layla",
+      phone: "+971500000111",
+      email: "ops@crystalclean.local",
+      serviceType: "Laundry",
+      status: "active",
+    },
+    update: {},
+  });
+
+  const driverPass = await bcrypt.hash("driver123", 10);
+  const driver = await db.user.upsert({
+    where: { email: "driver@brilla.local" },
+    create: { email: "driver@brilla.local", name: "Dana Driver", passwordHash: driverPass },
+    update: {},
+  });
+  const driverRole = await db.role.findUnique({ where: { key: "driver" } });
+  if (driverRole) {
+    await db.userRole.upsert({
+      where: { userId_roleId: { userId: driver.id, roleId: driverRole.id } },
+      create: { userId: driver.id, roleId: driverRole.id },
+      update: {},
+    });
+  }
+  await db.staffProfile.upsert({
+    where: { userId: driver.id },
+    create: { userId: driver.id, employeeType: "full-time", transportAvailable: true, skills: JSON.stringify(["driving_licence"]) },
+    update: {},
+  });
+
   console.log("Seed complete.");
   console.log("  Admin login:   admin@brilla.local / admin123");
   console.log("  Cleaner login: cleaner@brilla.local / cleaner123");
+  console.log("  Driver login:  driver@brilla.local / driver123");
   console.log(`  Sample service version id: ${version.id}`);
 }
 

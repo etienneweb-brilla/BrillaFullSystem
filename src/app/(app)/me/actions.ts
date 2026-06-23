@@ -114,6 +114,23 @@ export async function completeTask(formData: FormData) {
   revalidatePath("/me");
 }
 
+/** Driver marks a laundry batch they're assigned to as collected/delivered. */
+export async function driverUpdateBatch(formData: FormData) {
+  const staffId = await myProfileId();
+  const batchId = String(formData.get("batchId") ?? "");
+  const status = String(formData.get("status") ?? "");
+  if (!staffId || !batchId) return;
+  const batch = await db.laundryBatch.findFirst({ where: { id: batchId, driverStaffId: staffId } });
+  if (!batch) return; // only the assigned driver can update
+  const allowed = ["collected", "returned"];
+  if (!allowed.includes(status)) return;
+  const data: { status: string; collectionDate?: Date; returnDate?: Date } = { status };
+  if (status === "collected") data.collectionDate = new Date();
+  if (status === "returned") data.returnDate = new Date();
+  await db.laundryBatch.update({ where: { id: batchId }, data });
+  revalidatePath("/me");
+}
+
 export async function reportIssue(formData: FormData) {
   const user = await requireUser();
   const taskId = String(formData.get("taskId") ?? "") || null;

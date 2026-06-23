@@ -20,3 +20,9 @@ export async function nextQuoteNumber(): Promise<string> {
   const count = await db.quote.count();
   return `Q-${year}-${String(count + 1).padStart(4, "0")}`;
 }
+
+export async function nextLaundryBatchNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  const count = await db.laundryBatch.count();
+  return `LB-${year}-${String(count + 1).padStart(4, "0")}`;
+}

@@ -41,22 +41,22 @@ model User {
   staffProfile StaffProfile?
 
   // Activity authored by this user
-  auditLogs    AuditLog[]
+  auditLogs AuditLog[]
 }
 
 // Configurable roles (Admin, Supervisor, Cleaner, Driver, Technician, Laundry, Client...).
 // `permissions` is JSON text: a map of section keys -> boolean, plus capability flags.
 model Role {
-  id          String     @id @default(cuid())
-  key         String     @unique // stable machine key, e.g. "admin", "cleaner"
+  id          String   @id @default(cuid())
+  key         String   @unique // stable machine key, e.g. "admin", "cleaner"
   name        String
   description String?
-  isStaffRole Boolean    @default(true) // staff roles get the simplified mobile dashboards
-  permissions String     @default("{}") // JSON: { "settings": true, "workorders": true, ... }
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  isStaffRole Boolean  @default(true) // staff roles get the simplified mobile dashboards
+  permissions String   @default("{}") // JSON: { "settings": true, "workorders": true, ... }
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  users       UserRole[]
+  users UserRole[]
 }
 
 model UserRole {
@@ -70,30 +70,31 @@ model UserRole {
 }
 
 model StaffProfile {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  phone           String?
-  address         String?
-  emergencyContact String?
-  employeeType    String?  // full-time | part-time | contractor | outsourced (configurable text)
-  skills          String   @default("[]") // JSON array of skill keys
-  certificates    String   @default("[]") // JSON array of { name, expiry }
-  availability    String   @default("{}") // JSON: days, hours, unavailable dates, maxHoursPerWeek
-  preferredLocations String @default("[]") // JSON array
-  transportAvailable Boolean @default(false)
-  active          Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  phone              String?
+  address            String?
+  emergencyContact   String?
+  employeeType       String? // full-time | part-time | contractor | outsourced (configurable text)
+  skills             String   @default("[]") // JSON array of skill keys
+  certificates       String   @default("[]") // JSON array of { name, expiry }
+  availability       String   @default("{}") // JSON: days, hours, unavailable dates, maxHoursPerWeek
+  preferredLocations String   @default("[]") // JSON array
+  transportAvailable Boolean  @default(false)
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  eligibility     ServiceEligibility[]
-  payrollRule     PayrollRule?
+  eligibility ServiceEligibility[]
+  payrollRule PayrollRule?
 
   // Operational links
   assignedServiceLines ServiceLine[]
-  assignedTasks   Task[]
-  timeEntries     TimeEntry[]
+  assignedTasks        Task[]
+  timeEntries          TimeEntry[]
+  laundryBatches       LaundryBatch[] // batches where this staff member is the assigned driver
 }
 
 // Which services a staff member may be assigned to (spec 5.9 / 10.2).
@@ -119,13 +120,13 @@ model Setting {
 }
 
 model ServiceCategory {
-  id        String    @id @default(cuid())
-  name      String    @unique
+  id        String   @id @default(cuid())
+  name      String   @unique
   colour    String?
-  active    Boolean   @default(true)
-  createdAt DateTime  @default(now())
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
 
-  services  Service[]
+  services Service[]
 }
 
 model ClientType {
@@ -134,18 +135,18 @@ model ClientType {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  clients   Client[]
+  clients Client[]
 }
 
 // Configurable status options scoped by entity (workorder | serviceline | task).
 model StatusOption {
-  id        String  @id @default(cuid())
-  scope     String  // which entity this status applies to
-  key       String  // machine key e.g. "in_progress"
-  label     String
-  colour    String?
-  sortOrder Int     @default(0)
-  isDefault Boolean @default(false)
+  id         String  @id @default(cuid())
+  scope      String // which entity this status applies to
+  key        String // machine key e.g. "in_progress"
+  label      String
+  colour     String?
+  sortOrder  Int     @default(0)
+  isDefault  Boolean @default(false)
   isTerminal Boolean @default(false)
 
   @@unique([scope, key])
@@ -153,21 +154,21 @@ model StatusOption {
 
 // Configurable skill / certificate options for staff.
 model SkillOption {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  name      String
-  isCertificate Boolean @default(false)
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  key           String   @unique
+  name          String
+  isCertificate Boolean  @default(false)
+  createdAt     DateTime @default(now())
 }
 
 // Dynamic field definitions for property attributes and service forms (spec 5.3 / 14.2).
 model FieldDefinition {
   id        String   @id @default(cuid())
-  scope     String   // "property" | "serviceForm"
-  ownerId   String?  // for serviceForm: the ServiceVersion id; for property: null (global)
+  scope     String // "property" | "serviceForm"
+  ownerId   String? // for serviceForm: the ServiceVersion id; for property: null (global)
   key       String
   label     String
-  type      String   // text|number|currency|dropdown|multiselect|checkbox|date|time|address|notes|photo|signature|quantity
+  type      String // text|number|currency|dropdown|multiselect|checkbox|date|time|address|notes|photo|signature|quantity
   options   String   @default("[]") // JSON array for dropdown/multiselect
   required  Boolean  @default(false)
   sortOrder Int      @default(0)
@@ -181,49 +182,49 @@ model FieldDefinition {
 // ---------------------------------------------------------------------------
 
 model Service {
-  id          String   @id @default(cuid())
-  name        String
-  code        String?
-  categoryId  String?
-  category    ServiceCategory? @relation(fields: [categoryId], references: [id])
-  description String?
-  active      Boolean  @default(true)
-  isPublic    Boolean  @default(false) // public (client-requestable) vs internal
-  icon        String?
-  colour      String?
+  id            String           @id @default(cuid())
+  name          String
+  code          String?
+  categoryId    String?
+  category      ServiceCategory? @relation(fields: [categoryId], references: [id])
+  description   String?
+  active        Boolean          @default(true)
+  isPublic      Boolean          @default(false) // public (client-requestable) vs internal
+  icon          String?
+  colour        String?
   internalNotes String?
-  clientNotes String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  clientNotes   String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
-  versions    ServiceVersion[]
+  versions      ServiceVersion[]
   eligibleStaff ServiceEligibility[]
 }
 
 // Immutable snapshot of a service's configuration. Editing the service = new version.
 model ServiceVersion {
-  id          String   @id @default(cuid())
-  serviceId   String
-  service     Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  version     Int
-  isActive    Boolean  @default(true) // the version new Work Orders will use
-  defaultDuration Int?  // minutes
+  id              String  @id @default(cuid())
+  serviceId       String
+  service         Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  version         Int
+  isActive        Boolean @default(true) // the version new Work Orders will use
+  defaultDuration Int? // minutes
 
   // Pricing
-  pricingType String   @default("fixed") // see pricing.ts PRICING_TYPES
-  pricingConfig String @default("{}")    // JSON: rate, unitPrice, manpower defaults, formula, attribute key...
-  pricingRules  String @default("{}")    // JSON: minCharge, minHours, deposit, urgentFee, weekendFee, travelFee, cancellationFee...
-  defaultPrice  Float?                    // service default price (priority #1)
+  pricingType   String @default("fixed") // see pricing.ts PRICING_TYPES
+  pricingConfig String @default("{}") // JSON: rate, unitPrice, manpower defaults, formula, attribute key...
+  pricingRules  String @default("{}") // JSON: minCharge, minHours, deposit, urgentFee, weekendFee, travelFee, cancellationFee...
+  defaultPrice  Float? // service default price (priority #1)
 
   // Form / tasks / checklist / payroll captured as config (snapshotted)
-  formFields    String @default("[]")    // JSON array of field definitions for this service
-  taskTemplates String @default("[]")    // JSON array (also expanded into TaskTemplate rows below)
+  formFields          String  @default("[]") // JSON array of field definitions for this service
+  taskTemplates       String  @default("[]") // JSON array (also expanded into TaskTemplate rows below)
   checklistTemplateId String?
-  payrollRuleConfig   String @default("{}") // JSON: how this service pays (overridable per staff)
-  automationRules     String @default("[]") // JSON (placeholder for Phase 3 automation builder)
-  allowedRoleKeys     String @default("[]") // JSON array of role keys eligible for this service
+  payrollRuleConfig   String  @default("{}") // JSON: how this service pays (overridable per staff)
+  automationRules     String  @default("[]") // JSON (placeholder for Phase 3 automation builder)
+  allowedRoleKeys     String  @default("[]") // JSON array of role keys eligible for this service
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   taskTemplateRows TaskTemplate[]
   serviceLines     ServiceLine[]
@@ -238,36 +239,36 @@ model ChecklistTemplate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items     ChecklistItem[]
+  items ChecklistItem[]
 }
 
 model ChecklistItem {
-  id          String   @id @default(cuid())
-  templateId  String
-  template    ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  label       String
-  required    Boolean  @default(true)
-  photoRequired Boolean @default(false)
-  notesRequired Boolean @default(false)
-  signatureRequired Boolean @default(false)
-  supervisorApprovalRequired Boolean @default(false)
-  sortOrder   Int      @default(0)
+  id                         String            @id @default(cuid())
+  templateId                 String
+  template                   ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  label                      String
+  required                   Boolean           @default(true)
+  photoRequired              Boolean           @default(false)
+  notesRequired              Boolean           @default(false)
+  signatureRequired          Boolean           @default(false)
+  supervisorApprovalRequired Boolean           @default(false)
+  sortOrder                  Int               @default(0)
 }
 
 model TaskTemplate {
-  id             String   @id @default(cuid())
-  serviceVersionId String
-  serviceVersion ServiceVersion @relation(fields: [serviceVersionId], references: [id], onDelete: Cascade)
-  name           String
-  taskType       String?  // configurable label e.g. "collection", "treatment"
-  requiredRoleKey String?
-  dueOffsetMinutes Int?   // due relative to work order time
+  id                  String         @id @default(cuid())
+  serviceVersionId    String
+  serviceVersion      ServiceVersion @relation(fields: [serviceVersionId], references: [id], onDelete: Cascade)
+  name                String
+  taskType            String? // configurable label e.g. "collection", "treatment"
+  requiredRoleKey     String?
+  dueOffsetMinutes    Int? // due relative to work order time
   dependsOnTemplateId String? // simple dependency (must complete first)
   checklistTemplateId String?
-  photosRequired Boolean  @default(false)
-  notesRequired  Boolean  @default(false)
-  signatureRequired Boolean @default(false)
-  sortOrder      Int      @default(0)
+  photosRequired      Boolean        @default(false)
+  notesRequired       Boolean        @default(false)
+  signatureRequired   Boolean        @default(false)
+  sortOrder           Int            @default(0)
 }
 
 // ---------------------------------------------------------------------------
@@ -275,60 +276,61 @@ model TaskTemplate {
 // ---------------------------------------------------------------------------
 
 model Client {
-  id            String   @id @default(cuid())
-  name          String
-  phone         String?
-  email         String?
+  id             String      @id @default(cuid())
+  name           String
+  phone          String?
+  email          String?
   billingAddress String?
-  vatNumber     String?
-  paymentTerms  String?
-  clientTypeId  String?
-  clientType    ClientType? @relation(fields: [clientTypeId], references: [id])
-  notes         String?
-  active        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  vatNumber      String?
+  paymentTerms   String?
+  clientTypeId   String?
+  clientType     ClientType? @relation(fields: [clientTypeId], references: [id])
+  notes          String?
+  active         Boolean     @default(true)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
-  properties    Property[]
-  workOrders    WorkOrder[]
-  invoices      Invoice[]
-  quotes        Quote[]
+  properties Property[]
+  workOrders WorkOrder[]
+  invoices   Invoice[]
+  quotes     Quote[]
 }
 
 model Property {
-  id            String   @id @default(cuid())
-  clientId      String
-  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  name          String
-  address       String?
-  gps           String?
-  propertyType  String?
-  accessInstructions String?
-  keyboxCode    String?
-  alarmCode     String?
+  id                  String   @id @default(cuid())
+  clientId            String
+  client              Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name                String
+  address             String?
+  gps                 String?
+  propertyType        String?
+  accessInstructions  String?
+  keyboxCode          String?
+  alarmCode           String?
   parkingInstructions String?
-  internalNotes String?
-  clientNotes   String?
+  internalNotes       String?
+  clientNotes         String?
   // Service-specific instructions, keyed by service category/role (role-scoped on read)
-  instructions  String   @default("{}") // JSON map
+  instructions        String   @default("{}") // JSON map
   // Admin-defined dynamic attributes (bedrooms, pools, sqm...) — no hardcoding
-  fieldValues   String   @default("{}") // JSON map keyed by FieldDefinition.key
+  fieldValues         String   @default("{}") // JSON map keyed by FieldDefinition.key
   // Property-specific linen structure (Phase 2 laundry uses this); stored now, used later
-  linenSetup    String   @default("{}") // JSON
+  linenSetup          String   @default("{}") // JSON
   // Price overrides (priority #2)
-  priceOverrides String  @default("{}") // JSON map serviceId -> price
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  priceOverrides      String   @default("{}") // JSON map serviceId -> price
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  contacts      PropertyContact[]
-  workOrders    WorkOrder[]
+  contacts          PropertyContact[]
+  workOrders        WorkOrder[]
+  laundryBatchItems LaundryBatchItem[]
 }
 
 model PropertyContact {
   id         String   @id @default(cuid())
   propertyId String
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  role       String   // owner | manager | maintenance | guest | emergency | custom
+  role       String // owner | manager | maintenance | guest | emergency | custom
   name       String
   phone      String?
   email      String?
@@ -347,94 +349,95 @@ model PropertyTemplate {
 // ---------------------------------------------------------------------------
 
 model WorkOrder {
-  id          String   @id @default(cuid())
-  number      String   @unique
-  clientId    String
-  client      Client   @relation(fields: [clientId], references: [id])
-  propertyId  String
-  property    Property @relation(fields: [propertyId], references: [id])
-  scheduledAt DateTime?
-  status      String   @default("draft") // validated against StatusOption(scope=workorder)
+  id            String    @id @default(cuid())
+  number        String    @unique
+  clientId      String
+  client        Client    @relation(fields: [clientId], references: [id])
+  propertyId    String
+  property      Property  @relation(fields: [propertyId], references: [id])
+  scheduledAt   DateTime?
+  status        String    @default("draft") // validated against StatusOption(scope=workorder)
   internalNotes String?
-  clientNotes String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  clientNotes   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  serviceLines ServiceLine[]
-  tasks        Task[]
-  invoices     Invoice[]
-  issues       Issue[]
+  serviceLines   ServiceLine[]
+  tasks          Task[]
+  invoices       Invoice[]
+  issues         Issue[]
+  laundryBatches LaundryBatch[]
 }
 
 model ServiceLine {
-  id            String   @id @default(cuid())
-  workOrderId   String
-  workOrder     WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  id               String         @id @default(cuid())
+  workOrderId      String
+  workOrder        WorkOrder      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   serviceVersionId String
-  serviceVersion ServiceVersion @relation(fields: [serviceVersionId], references: [id])
+  serviceVersion   ServiceVersion @relation(fields: [serviceVersionId], references: [id])
 
   // Pricing snapshot + inputs
-  inputs        String   @default("{}") // JSON: hours, manpower, quantity, rooms, items...
-  price         Float    @default(0)    // computed client price for this line (ex/inc per settings)
-  manualPrice   Float?                  // manual override (priority #4)
+  inputs      String @default("{}") // JSON: hours, manpower, quantity, rooms, items...
+  price       Float  @default(0) // computed client price for this line (ex/inc per settings)
+  manualPrice Float? // manual override (priority #4)
 
-  fulfilmentMode String  @default("internal") // internal | outsourced | mixed
-  status        String   @default("pending")  // StatusOption(scope=serviceline)
+  fulfilmentMode String @default("internal") // internal | outsourced | mixed
+  status         String @default("pending") // StatusOption(scope=serviceline)
 
   // Assignment (single staff in Phase 1; team split is JSON for future)
   assignedStaffId String?
   assignedStaff   StaffProfile? @relation(fields: [assignedStaffId], references: [id])
-  teamSplit       String  @default("[]") // JSON for future team splits
+  teamSplit       String        @default("[]") // JSON for future team splits
 
   // Costs (for profit engine)
-  supplierCost  Float    @default(0)
-  materialCost  Float    @default(0)
-  driverCost    Float    @default(0)
+  supplierCost Float @default(0)
+  materialCost Float @default(0)
+  driverCost   Float @default(0)
 
   // Payroll/commission config snapshot for this line (overrides service/staff defaults)
-  payrollConfig String   @default("{}") // JSON
+  payrollConfig String @default("{}") // JSON
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tasks         Task[]
+  tasks Task[]
 }
 
 model Task {
-  id            String   @id @default(cuid())
+  id            String       @id @default(cuid())
   workOrderId   String
-  workOrder     WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  workOrder     WorkOrder    @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
   serviceLineId String?
   serviceLine   ServiceLine? @relation(fields: [serviceLineId], references: [id], onDelete: Cascade)
 
-  name          String
-  taskType      String?
+  name            String
+  taskType        String?
   requiredRoleKey String?
   assignedStaffId String?
   assignedStaff   StaffProfile? @relation(fields: [assignedStaffId], references: [id])
 
-  dueAt         DateTime?
-  startedAt     DateTime?
-  completedAt   DateTime?
-  status        String   @default("pending") // StatusOption(scope=task)
+  dueAt       DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  status      String    @default("pending") // StatusOption(scope=task)
 
   // Requirements snapshot from the task template
   checklistTemplateId String?
-  photosRequired Boolean @default(false)
-  notesRequired  Boolean @default(false)
-  signatureRequired Boolean @default(false)
-  dependsOnTaskId String?
+  photosRequired      Boolean @default(false)
+  notesRequired       Boolean @default(false)
+  signatureRequired   Boolean @default(false)
+  dependsOnTaskId     String?
 
   // Completion data
-  checklistResults String @default("[]") // JSON array of { itemId, done, note }
-  notes         String?
-  signatureData String?
+  checklistResults String  @default("[]") // JSON array of { itemId, done, note }
+  notes            String?
+  signatureData    String?
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  attachments   Attachment[]
-  issues        Issue[]
+  attachments Attachment[]
+  issues      Issue[]
 }
 
 // ---------------------------------------------------------------------------
@@ -442,33 +445,33 @@ model Task {
 // ---------------------------------------------------------------------------
 
 model PayrollRule {
-  id          String   @id @default(cuid())
-  staffId     String   @unique
-  staff       StaffProfile @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  payType     String   @default("hourly") // hourly|salary|commission|perTask|perServiceLine|hybrid
-  baseHourlyRate Float @default(0)
-  overtimeRate Float   @default(0)
-  sundayRate  Float    @default(0)
-  publicHolidayRate Float @default(0)
-  nightRate   Float    @default(0)
-  minPerJob   Float    @default(0)
-  commissionPercent Float @default(0)
-  commissionFixed   Float @default(0)
+  id                String       @id @default(cuid())
+  staffId           String       @unique
+  staff             StaffProfile @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  payType           String       @default("hourly") // hourly|salary|commission|perTask|perServiceLine|hybrid
+  baseHourlyRate    Float        @default(0)
+  overtimeRate      Float        @default(0)
+  sundayRate        Float        @default(0)
+  publicHolidayRate Float        @default(0)
+  nightRate         Float        @default(0)
+  minPerJob         Float        @default(0)
+  commissionPercent Float        @default(0)
+  commissionFixed   Float        @default(0)
   // Per-service overrides: JSON map serviceId -> { payType, commissionPercent, ... }
-  serviceOverrides String @default("{}")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  serviceOverrides  String       @default("{}")
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 }
 
 // Payroll periods — locking is a Phase 3 feature; lockedAt placeholder included now.
 model PayrollPeriod {
-  id        String   @id @default(cuid())
-  label     String
-  startDate DateTime
-  endDate   DateTime
-  lockedAt  DateTime?
+  id         String    @id @default(cuid())
+  label      String
+  startDate  DateTime
+  endDate    DateTime
+  lockedAt   DateTime?
   lockedById String?
-  createdAt DateTime @default(now())
+  createdAt  DateTime  @default(now())
 }
 
 // ---------------------------------------------------------------------------
@@ -476,52 +479,52 @@ model PayrollPeriod {
 // ---------------------------------------------------------------------------
 
 model Quote {
-  id        String   @id @default(cuid())
-  number    String   @unique
-  clientId  String
-  client    Client   @relation(fields: [clientId], references: [id])
-  propertyId String?
-  lines     String   @default("[]") // JSON snapshot of quoted service lines
-  subtotal  Float    @default(0)
-  vatAmount Float    @default(0)
-  total     Float    @default(0)
-  notes     String?
-  terms     String?
-  status    String   @default("draft") // draft | sent | accepted | rejected | expired | converted
-  expiresAt DateTime?
+  id                   String    @id @default(cuid())
+  number               String    @unique
+  clientId             String
+  client               Client    @relation(fields: [clientId], references: [id])
+  propertyId           String?
+  lines                String    @default("[]") // JSON snapshot of quoted service lines
+  subtotal             Float     @default(0)
+  vatAmount            Float     @default(0)
+  total                Float     @default(0)
+  notes                String?
+  terms                String?
+  status               String    @default("draft") // draft | sent | accepted | rejected | expired | converted
+  expiresAt            DateTime?
   convertedWorkOrderId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 }
 
 model Invoice {
-  id          String   @id @default(cuid())
-  number      String   @unique
+  id          String     @id @default(cuid())
+  number      String     @unique
   workOrderId String?
   workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id])
   clientId    String
-  client      Client   @relation(fields: [clientId], references: [id])
-  lines       String   @default("[]") // JSON snapshot of invoiced lines
-  subtotal    Float    @default(0)
-  discount    Float    @default(0)
-  vatRate     Float    @default(0)
-  vatAmount   Float    @default(0)
-  total       Float    @default(0)
-  amountPaid  Float    @default(0)
-  status      String   @default("unpaid") // unpaid | partial | paid | cancelled
-  issuedAt    DateTime @default(now())
+  client      Client     @relation(fields: [clientId], references: [id])
+  lines       String     @default("[]") // JSON snapshot of invoiced lines
+  subtotal    Float      @default(0)
+  discount    Float      @default(0)
+  vatRate     Float      @default(0)
+  vatAmount   Float      @default(0)
+  total       Float      @default(0)
+  amountPaid  Float      @default(0)
+  status      String     @default("unpaid") // unpaid | partial | paid | cancelled
+  issuedAt    DateTime   @default(now())
   dueAt       DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  payments    Payment[]
+  payments Payment[]
 }
 
 model Payment {
   id        String   @id @default(cuid())
   invoiceId String
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  method    String   // bank | cash | card | stripe | applepay | googlepay | other
+  method    String // bank | cash | card | stripe | applepay | googlepay | other
   amount    Float
   reference String?
   paidAt    DateTime @default(now())
@@ -534,37 +537,37 @@ model Payment {
 
 // Polymorphic file attachment (photos/docs). Local filesystem storage in dev.
 model Attachment {
-  id         String   @id @default(cuid())
-  entityType String   // property | workorder | serviceline | task | invoice | staff | issue
-  entityId   String
-  taskId     String?  // convenience relation for task photos
-  task       Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  url        String   // /uploads/...
-  fileName   String
-  fileType   String   @default("general") // before|after|proof|damage|missing|general|document
+  id           String   @id @default(cuid())
+  entityType   String // property | workorder | serviceline | task | invoice | staff | issue
+  entityId     String
+  taskId       String? // convenience relation for task photos
+  task         Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  url          String // /uploads/...
+  fileName     String
+  fileType     String   @default("general") // before|after|proof|damage|missing|general|document
   uploadedById String?
-  createdAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
 
   @@index([entityType, entityId])
 }
 
 model Issue {
-  id          String   @id @default(cuid())
-  type        String   // configurable: missing_keys, complaint, damage, access...
-  title       String
-  description String?
-  priority    String   @default("normal") // low|normal|high|urgent
-  status      String   @default("open")   // open|in_progress|resolved|closed
-  propertyId  String?
-  workOrderId String?
-  workOrder   WorkOrder? @relation(fields: [workOrderId], references: [id])
-  taskId      String?
-  task        Task?    @relation(fields: [taskId], references: [id])
+  id           String     @id @default(cuid())
+  type         String // configurable: missing_keys, complaint, damage, access...
+  title        String
+  description  String?
+  priority     String     @default("normal") // low|normal|high|urgent
+  status       String     @default("open") // open|in_progress|resolved|closed
+  propertyId   String?
+  workOrderId  String?
+  workOrder    WorkOrder? @relation(fields: [workOrderId], references: [id])
+  taskId       String?
+  task         Task?      @relation(fields: [taskId], references: [id])
   assignedToId String?
-  createdById String?
-  resolution  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdById  String?
+  resolution   String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 }
 
 model AuditLog {
@@ -573,22 +576,95 @@ model AuditLog {
   actor      User?    @relation(fields: [actorId], references: [id])
   entityType String
   entityId   String
-  action     String   // create | update | delete | status_change | price_change
-  oldValue   String?  // JSON
-  newValue   String?  // JSON
+  action     String // create | update | delete | status_change | price_change
+  oldValue   String? // JSON
+  newValue   String? // JSON
   createdAt  DateTime @default(now())
 
   @@index([entityType, entityId])
 }
 
 model TimeEntry {
-  id        String   @id @default(cuid())
-  staffId   String
-  staff     StaffProfile @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  taskId    String?
-  clockIn   DateTime
-  clockOut  DateTime?
-  breakMinutes Int    @default(0)
-  notes     String?
-  createdAt DateTime @default(now())
+  id           String       @id @default(cuid())
+  staffId      String
+  staff        StaffProfile @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  taskId       String?
+  clockIn      DateTime
+  clockOut     DateTime?
+  breakMinutes Int          @default(0)
+  notes        String?
+  createdAt    DateTime     @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// PHASE 2: SUPPLIERS & LAUNDRY (spec §15, §16, §17)
+// ---------------------------------------------------------------------------
+
+// Suppliers for outsourced services (laundry now, anything later). Spec §16.
+model Supplier {
+  id            String   @id @default(cuid())
+  name          String
+  contactPerson String?
+  phone         String?
+  email         String?
+  serviceType   String? // e.g. "Laundry" — configurable text
+  priceList     String   @default("{}") // JSON
+  notes         String?
+  status        String   @default("active") // active | inactive
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  laundryBatches LaundryBatch[]
+}
+
+// Laundry item catalogue (spec 15.2). Prices come from here; quantities from property linen setup.
+model LaundryItem {
+  id           String   @id @default(cuid())
+  name         String
+  category     String?
+  active       Boolean  @default(true)
+  clientPrice  Float    @default(0)
+  supplierCost Float    @default(0)
+  internalCost Float    @default(0)
+  createdAt    DateTime @default(now())
+
+  batchItems LaundryBatchItem[]
+}
+
+// A laundry batch moves through a lifecycle and can span multiple properties (spec 15.5/15.6).
+model LaundryBatch {
+  id             String        @id @default(cuid())
+  number         String        @unique
+  status         String        @default("created") // created|collected|sent|processing|returned|verified|completed
+  fulfilmentMode String        @default("outsourced") // outsourced | internal | mixed
+  supplierId     String?
+  supplier       Supplier?     @relation(fields: [supplierId], references: [id])
+  driverStaffId  String?
+  driver         StaffProfile? @relation(fields: [driverStaffId], references: [id])
+  workOrderId    String?
+  workOrder      WorkOrder?    @relation(fields: [workOrderId], references: [id])
+  collectionDate DateTime?
+  returnDate     DateTime?
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  items LaundryBatchItem[]
+}
+
+// One counted line within a batch. Return verification compares collected vs returned (spec 15.7).
+model LaundryBatchItem {
+  id            String       @id @default(cuid())
+  batchId       String
+  batch         LaundryBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  propertyId    String?
+  property      Property?    @relation(fields: [propertyId], references: [id])
+  laundryItemId String?
+  laundryItem   LaundryItem? @relation(fields: [laundryItemId], references: [id])
+  itemName      String // snapshot of the item name at collection time
+  collectedQty  Int          @default(0)
+  returnedQty   Int          @default(0)
+  damagedQty    Int          @default(0)
+  // missing is derived: max(collected - returned - damaged, 0)
+  createdAt     DateTime     @default(now())
 }
